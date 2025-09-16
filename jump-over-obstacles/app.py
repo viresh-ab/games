@@ -9,26 +9,31 @@ st.write("Move the basket left/right using buttons and catch the apples!")
 # --- Game settings ---
 GRID_WIDTH = 10
 GRID_HEIGHT = 10
+TICK_SPEED = 0.3  # seconds per frame
 
-basket_pos = GRID_WIDTH // 2
-apple_pos = [random.randint(0, GRID_WIDTH - 1), 0]  # x, y
-score = 0
-missed = 0
-game_over = False
-
-# --- Streamlit placeholders ---
-game_placeholder = st.empty()
-score_placeholder = st.empty()
+# --- Initialize session state ---
+if "basket_pos" not in st.session_state:
+    st.session_state.basket_pos = GRID_WIDTH // 2
+if "apple_pos" not in st.session_state:
+    st.session_state.apple_pos = [random.randint(0, GRID_WIDTH - 1), 0]
+if "score" not in st.session_state:
+    st.session_state.score = 0
+if "missed" not in st.session_state:
+    st.session_state.missed = 0
+if "game_over" not in st.session_state:
+    st.session_state.game_over = False
+if "running" not in st.session_state:
+    st.session_state.running = False
 
 # --- Draw the game frame ---
-def draw_frame(basket_x, apple_xy):
+def draw_frame():
     frame = ""
     for y in range(GRID_HEIGHT):
         line = ""
         for x in range(GRID_WIDTH):
-            if [x, y] == apple_xy:
+            if [x, y] == st.session_state.apple_pos:
                 line += "🍎"
-            elif y == GRID_HEIGHT - 1 and x == basket_x:
+            elif y == GRID_HEIGHT - 1 and x == st.session_state.basket_pos:
                 line += "🧺"
             else:
                 line += "⬜"
@@ -38,42 +43,48 @@ def draw_frame(basket_x, apple_xy):
 # --- Control buttons ---
 col1, col2 = st.columns(2)
 if col1.button("⬅️ Left"):
-    if basket_pos > 0:
-        basket_pos -= 1
+    if st.session_state.basket_pos > 0:
+        st.session_state.basket_pos -= 1
 if col2.button("➡️ Right"):
-    if basket_pos < GRID_WIDTH - 1:
-        basket_pos += 1
+    if st.session_state.basket_pos < GRID_WIDTH - 1:
+        st.session_state.basket_pos += 1
+
+# --- Game placeholders ---
+game_placeholder = st.empty()
+score_placeholder = st.empty()
+
+# --- Start button ---
+if st.button("Start Game"):
+    st.session_state.running = True
+    st.session_state.basket_pos = GRID_WIDTH // 2
+    st.session_state.apple_pos = [random.randint(0, GRID_WIDTH - 1), 0]
+    st.session_state.score = 0
+    st.session_state.missed = 0
+    st.session_state.game_over = False
 
 # --- Game loop ---
-start_button = st.button("Start Game")
+while st.session_state.running and not st.session_state.game_over:
+    # Draw
+    game_placeholder.text(draw_frame())
+    score_placeholder.write(f"Score: {st.session_state.score} | Missed: {st.session_state.missed}")
 
-if start_button:
-    basket_pos = GRID_WIDTH // 2
-    apple_pos = [random.randint(0, GRID_WIDTH - 1), 0]
-    score = 0
-    missed = 0
-    game_over = False
+    time.sleep(TICK_SPEED)
 
-    while not game_over:
-        # Draw frame
-        game_placeholder.text(draw_frame(basket_pos, apple_pos))
-        score_placeholder.write(f"Score: {score} | Missed: {missed}")
+    # Move apple
+    st.session_state.apple_pos[1] += 1
 
-        time.sleep(0.5)
+    # Check collision
+    if st.session_state.apple_pos[1] == GRID_HEIGHT - 1:
+        if st.session_state.apple_pos[0] == st.session_state.basket_pos:
+            st.session_state.score += 1
+        else:
+            st.session_state.missed += 1
+        st.session_state.apple_pos = [random.randint(0, GRID_WIDTH - 1), 0]
 
-        # Move apple down
-        apple_pos[1] += 1
-
-        # Check collision
-        if apple_pos[1] == GRID_HEIGHT - 1:
-            if apple_pos[0] == basket_pos:
-                score += 1
-            else:
-                missed += 1
-            apple_pos = [random.randint(0, GRID_WIDTH - 1), 0]
-
-        if missed >= 3:
-            game_over = True
-            game_placeholder.text(draw_frame(basket_pos, apple_pos))
-            score_placeholder.write(f"Game Over! Final Score: {score}")
-            break
+    # Check game over
+    if st.session_state.missed >= 3:
+        st.session_state.game_over = True
+        game_placeholder.text(draw_frame())
+        score_placeholder.write(f"Game Over! Final Score: {st.session_state.score}")
+        st.session_state.running = False
+        break
