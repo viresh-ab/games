@@ -1,109 +1,79 @@
 import streamlit as st
+import random
 import time
 
-st.set_page_config(page_title="🌙 Jump Game", page_icon="🌙", layout="centered")
-st.title("🌙 Jump Over Obstacles Game")
-st.write("Press SPACE to jump! Avoid the red obstacles.")
+st.set_page_config(page_title="🍎 Catch the Apples", page_icon="🍎", layout="centered")
+st.title("🍎 Catch the Apples Game")
+st.write("Move the basket left/right using buttons and catch the apples!")
 
 # --- Game settings ---
-WINDOW_HEIGHT = 10      # Number of vertical blocks
-WINDOW_WIDTH = 30       # Number of horizontal blocks
-GROUND_LEVEL = WINDOW_HEIGHT - 1
+GRID_WIDTH = 10
+GRID_HEIGHT = 10
 
-player_pos = 0          # Vertical position (0 = top)
-player_jump = False
-jump_height = 3
-jump_counter = 0
-
-obstacle_pos = WINDOW_WIDTH - 1
-obstacle_speed = 1      # Blocks per frame
-
+basket_pos = GRID_WIDTH // 2
+apple_pos = [random.randint(0, GRID_WIDTH - 1), 0]  # x, y
 score = 0
+missed = 0
 game_over = False
 
 # --- Streamlit placeholders ---
 game_placeholder = st.empty()
 score_placeholder = st.empty()
-start_button = st.button("Start Game")
 
 # --- Draw the game frame ---
-def draw_frame(player_y, obstacle_x):
+def draw_frame(basket_x, apple_xy):
     frame = ""
-    for y in range(WINDOW_HEIGHT):
+    for y in range(GRID_HEIGHT):
         line = ""
-        for x in range(WINDOW_WIDTH):
-            if y == GROUND_LEVEL:
-                line += "🟩"  # Ground
-            elif x == 2 and y == player_y:
-                line += "🙂"  # Player
-            elif x == obstacle_x and y == GROUND_LEVEL - 1:
-                line += "🟥"  # Obstacle
+        for x in range(GRID_WIDTH):
+            if [x, y] == apple_xy:
+                line += "🍎"
+            elif y == GRID_HEIGHT - 1 and x == basket_x:
+                line += "🧺"
             else:
-                line += "⬜"  # Empty space
+                line += "⬜"
         frame += line + "\n"
     return frame
 
+# --- Control buttons ---
+col1, col2 = st.columns(2)
+if col1.button("⬅️ Left"):
+    if basket_pos > 0:
+        basket_pos -= 1
+if col2.button("➡️ Right"):
+    if basket_pos < GRID_WIDTH - 1:
+        basket_pos += 1
+
 # --- Game loop ---
+start_button = st.button("Start Game")
+
 if start_button:
-    player_pos = GROUND_LEVEL - 1
-    obstacle_pos = WINDOW_WIDTH - 1
+    basket_pos = GRID_WIDTH // 2
+    apple_pos = [random.randint(0, GRID_WIDTH - 1), 0]
     score = 0
-    jump_counter = 0
+    missed = 0
     game_over = False
 
-    st.info("Press SPACE in your keyboard to jump (focus must be on the browser)")
-
-    # We need JS to capture SPACE key
-    st.markdown(
-        """
-        <script>
-        const playerJump = () => {
-            const input = window.parent.document.querySelector('body');
-            input.addEventListener('keydown', (e) => {
-                if (e.code === 'Space') {
-                    fetch("/jump");
-                }
-            });
-        };
-        playerJump();
-        </script>
-        """,
-        unsafe_allow_html=True,
-    )
-
     while not game_over:
-        # Jump logic
-        if jump_counter > 0:
-            player_pos = GROUND_LEVEL - 1 - jump_height
-            jump_counter -= 1
-        else:
-            player_pos = GROUND_LEVEL - 1
-
         # Draw frame
-        frame_text = draw_frame(player_pos, obstacle_pos)
-        game_placeholder.text(frame_text)
-        score_placeholder.write(f"Score: {score}")
+        game_placeholder.text(draw_frame(basket_pos, apple_pos))
+        score_placeholder.write(f"Score: {score} | Missed: {missed}")
 
-        # Update obstacle
-        obstacle_pos -= obstacle_speed
-        if obstacle_pos < 0:
-            obstacle_pos = WINDOW_WIDTH - 1
-            score += 1
+        time.sleep(0.5)
 
-        # Collision detection
-        if obstacle_pos == 2 and player_pos == GROUND_LEVEL - 1:
+        # Move apple down
+        apple_pos[1] += 1
+
+        # Check collision
+        if apple_pos[1] == GRID_HEIGHT - 1:
+            if apple_pos[0] == basket_pos:
+                score += 1
+            else:
+                missed += 1
+            apple_pos = [random.randint(0, GRID_WIDTH - 1), 0]
+
+        if missed >= 3:
             game_over = True
-            game_placeholder.text(draw_frame(player_pos, obstacle_pos))
-            score_placeholder.write(f"Game Over! Your Score: {score}")
+            game_placeholder.text(draw_frame(basket_pos, apple_pos))
+            score_placeholder.write(f"Game Over! Final Score: {score}")
             break
-
-        time.sleep(0.15)  # Control game speed
-
-        # Handle jump (simulate pressing SPACE)
-        if st.session_state.get("jump", False):
-            jump_counter = 3
-            st.session_state["jump"] = False
-
-# --- Jump Button for browsers that can't capture key ---
-if st.button("Jump"):
-    st.session_state["jump"] = True
